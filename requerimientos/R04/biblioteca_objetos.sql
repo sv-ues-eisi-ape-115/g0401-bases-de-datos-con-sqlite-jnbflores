@@ -1,77 +1,94 @@
--- =============================================================
--- G0401 — APE 115 — Requerimiento R04
--- Archivo: requerimientos/R04/biblioteca_objetos.sql
--- Descripción: Vistas y Triggers con sintaxis SQLite
--- Autor: (escribe tu nombre aquí)
--- Ejecutar: sqlite3 biblioteca.db < biblioteca_objetos.sql
--- =============================================================
-
+-- Activar claves foráneas
 PRAGMA foreign_keys = ON;
+
+-- Mostrar resultados legibles
 .headers on
 .mode column
 
--- ── VISTA 1: vw_prestamo_activo ───────────────────────────────
--- Columnas requeridas:
---   id_prestamo, fecha_prestamo, fecha_devolucion,
---   dias_restantes = ROUND(julianday(fecha_devolucion) - julianday(date('now')))
---   estado, nombre completo (con ||), carnet, titulo del libro, isbn
--- Solo préstamos con estado = 'activo'
+-- ELIMINAR OBJETOS SI EXISTEN
+
 DROP VIEW IF EXISTS vw_prestamo_activo;
--- TODO: CREATE VIEW vw_prestamo_activo AS ...
-
-
--- ── VISTA 2: vw_libro_disponibilidad ─────────────────────────
--- Columnas: titulo, autor (nombre), stock_total, stock_disponible,
---   prestados_ahora = (stock_total - stock_disponible),
---   pct_disponible = ROUND(stock_disponible * 100.0 / stock_total)
 DROP VIEW IF EXISTS vw_libro_disponibilidad;
--- TODO: CREATE VIEW vw_libro_disponibilidad AS ...
 
-
--- ── TRIGGER 1: trg_prestamo_nuevo ────────────────────────────
--- AFTER INSERT ON prestamo FOR EACH ROW
--- Acción: decrementa stock_disponible del libro
--- Validación: si stock < 0 → RAISE(ROLLBACK, 'Sin stock disponible')
 DROP TRIGGER IF EXISTS trg_prestamo_nuevo;
--- TODO: CREATE TRIGGER trg_prestamo_nuevo
---       AFTER INSERT ON prestamo FOR EACH ROW
---       BEGIN
---           UPDATE libro SET stock_disponible = stock_disponible - 1
---           WHERE id_libro = NEW.id_libro;
---           SELECT CASE WHEN (SELECT stock_disponible FROM libro
---                             WHERE id_libro = NEW.id_libro) < 0
---                       THEN RAISE(ROLLBACK, 'Sin stock disponible')
---                  END;
---       END;
-
-
--- ── TRIGGER 2: trg_prestamo_devuelto ─────────────────────────
--- AFTER UPDATE ON prestamo FOR EACH ROW
--- WHEN NEW.estado = 'devuelto' AND NEW.fecha_devuelto IS NULL
--- Acción: asigna fecha_devuelto, incrementa stock_disponible
 DROP TRIGGER IF EXISTS trg_prestamo_devuelto;
--- TODO: CREATE TRIGGER trg_prestamo_devuelto
---       AFTER UPDATE ON prestamo FOR EACH ROW
---       WHEN NEW.estado = 'devuelto' AND NEW.fecha_devuelto IS NULL
---       BEGIN
---           UPDATE prestamo SET fecha_devuelto = datetime('now','localtime')
---           WHERE id_prestamo = OLD.id_prestamo;
---           UPDATE libro SET stock_disponible = stock_disponible + 1
---           WHERE id_libro = OLD.id_libro;
---       END;
 
+-- VISTA 1
+-- Préstamos activos
 
--- ── Prueba del flujo completo (reemplaza los TODO) ────────────
--- 1. Registrar un nuevo préstamo
--- TODO: INSERT INTO prestamo(fecha_devolucion, id_estudiante, id_libro)
---       VALUES (date('now', '+7 days'), 1, 1);
+CREATE VIEW vw_prestamo_activo AS
+SELECT p.id_prestamo,
+       e.nombres || ' ' || e.apellidos AS estudiante,
+       l.titulo,
+       p.fecha_prestamo,
+       p.fecha_devolucion,
+       julianday(p.fecha_devolucion) -
+       julianday(date('now')) AS dias_restantes
+FROM prestamo p
+INNER JOIN estudiante e
+    ON p.id_estudiante = e.id_estudiante
+INNER JOIN libro l
+    ON p.id_libro = l.id_libro
+WHERE p.estado = 'activo';
 
--- 2. Verificar disponibilidad
--- SELECT * FROM vw_libro_disponibilidad;
+-- VISTA 2
+-- Disponibilidad de libros
 
--- 3. Devolver el préstamo
--- TODO: UPDATE prestamo SET estado = 'devuelto'
---       WHERE id_prestamo = (SELECT MAX(id_prestamo) FROM prestamo);
+CREATE VIEW vw_libro_disponibilidad AS
+SELECT titulo,
+       stock_disponible
+FROM libro;
 
--- 4. Verificar que la vista ya no lo muestra
--- SELECT * FROM vw_prestamo_activo;
+-- TRIGGER 1
+-- Validar stock antes de préstamo
+
+CREATE TRIGGER trg_prestamo_nuevo
+BEFORE INSERT ON prestamo
+FOR EACH ROW
+WHEN (
+    SELECT stock_disponible
+    FROM libro
+    WHERE id_libro = NEW.id_libro
+) <= 0
+
+BEGIN
+    SELECT RAISE(
+        ROLLBACK,
+        'No hay stock disponible para este libro'
+    );
+END;
+
+-- TRIGGER 2
+-- Actualizar stock al devolver libro
+
+CREATE TRIGGER trg_prestamo_devuelto
+AFTER UPDATE OF estado ON prestamo
+FOR EACH ROW
+WHEN NEW.estado = 'devuelto'
+
+BEGIN
+    UPDATE libro
+    SET stock_disponible = stock_disponible + 1
+    WHERE id_libro = NEW.id_libro;
+END;
+
+-- PRUEBA DEL FLUJO COMPLETO
+
+-- Insertar nuevo préstamo
+INSERT OR IGNORE INTO prestamo
+(id_prestamo, id_estudiante, id_libro,
+ fecha_prestamo, fecha_devolucion, estado)
+VALUES
+(11, 2, 2, date('now'),
+ date('now','+7 day'), 'activo');
+
+-- Consultar vista de préstamos activos
+SELECT * FROM vw_prestamo_activo;
+
+-- Devolver préstamo
+UPDATE prestamo
+SET estado = 'devuelto'
+WHERE id_prestamo = 11;
+
+-- Consultar disponibilidad de libros
+SELECT * FROM vw_libro_disponibilidad;

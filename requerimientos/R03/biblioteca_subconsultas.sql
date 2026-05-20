@@ -1,45 +1,89 @@
--- =============================================================
--- G0401 — APE 115 — Requerimiento R03
--- Archivo: requerimientos/R03/biblioteca_subconsultas.sql
--- Descripción: Subconsultas — análisis avanzado
--- Autor: (escribe tu nombre aquí)
--- Ejecutar: sqlite3 biblioteca.db < biblioteca_subconsultas.sql
--- =============================================================
-
+-- Activar claves foráneas
 PRAGMA foreign_keys = ON;
+
+-- Mostrar resultados legibles
 .headers on
 .mode column
 
--- ── R03.1 — Subconsulta ESCALAR ───────────────────────────────
--- Estudiantes que han tomado prestado MÁS libros que el promedio
--- Promedio = CAST(COUNT(*) AS REAL) / COUNT(DISTINCT id_estudiante)
--- TODO:
+-- R03.1
+-- Estudiantes que han tomado más libros que el promedio
 
+SELECT e.nombres || ' ' || e.apellidos AS estudiante,
+       COUNT(p.id_prestamo) AS total_prestamos
+FROM estudiante e
+INNER JOIN prestamo p
+    ON e.id_estudiante = p.id_estudiante
+GROUP BY e.id_estudiante
+HAVING COUNT(p.id_prestamo) >
+(
+    SELECT COUNT(*) * 1.0 /
+           COUNT(DISTINCT id_estudiante)
+    FROM prestamo
+);
 
--- ── R03.2 — Subconsulta CORRELACIONADA ───────────────────────
--- Libros más caros que el precio promedio del MISMO autor
--- (la subconsulta interna debe referenciar id_autor de la consulta externa)
--- TODO:
+-- R03.2
+-- Libros cuyo precio es mayor al promedio de libros
+-- del mismo autor
 
+SELECT l1.titulo,
+       l1.precio,
+       l1.id_autor
+FROM libro l1
+WHERE l1.precio >
+(
+    SELECT AVG(l2.precio)
+    FROM libro l2
+    WHERE l2.id_autor = l1.id_autor
+);
 
--- ── R03.3 — NOT IN ────────────────────────────────────────────
--- Estudiantes sin ningún préstamo activo actualmente
--- TODO:
+-- R03.3
+-- Estudiantes sin préstamos activos actualmente
 
+SELECT e.nombres || ' ' || e.apellidos AS estudiante
+FROM estudiante e
+WHERE e.id_estudiante NOT IN
+(
+    SELECT p.id_estudiante
+    FROM prestamo p
+    WHERE p.estado = 'activo'
+);
 
--- ── R03.4 — Correlacionada en SELECT ─────────────────────────
--- Para cada autor: título y precio de su libro más caro
--- TODO:
+-- R03.4
+-- Libro más caro por autor
 
+SELECT a.nombre AS autor,
+       l.titulo,
+       l.precio
+FROM autor a
+INNER JOIN libro l
+    ON a.id_autor = l.id_autor
+WHERE l.precio =
+(
+    SELECT MAX(l2.precio)
+    FROM libro l2
+    WHERE l2.id_autor = a.id_autor
+);
 
--- ── R03.5 — Comparación: GROUP BY vs IN ─────────────────────
--- Libros prestados al menos 2 veces — implementar AMBAS versiones:
+-- R03.5
+-- Libros prestados al menos 2 veces usando HAVING
 
--- Versión A: GROUP BY + HAVING
--- TODO:
+SELECT l.titulo,
+       COUNT(p.id_prestamo) AS total_prestamos
+FROM libro l
+INNER JOIN prestamo p
+    ON l.id_libro = p.id_libro
+GROUP BY l.id_libro
+HAVING COUNT(p.id_prestamo) >= 2;
 
--- Versión B: Subconsulta con IN
--- TODO:
+-- R03.5
+-- Libros prestados al menos 2 veces 
 
--- Comentario: explica cuál de las dos versiones es más eficiente y por qué
--- TODO: (escribe aquí tu respuesta como comentario SQL)
+SELECT l.titulo
+FROM libro l
+WHERE l.id_libro IN
+(
+    SELECT p.id_libro
+    FROM prestamo p
+    GROUP BY p.id_libro
+    HAVING COUNT(*) >= 2
+);

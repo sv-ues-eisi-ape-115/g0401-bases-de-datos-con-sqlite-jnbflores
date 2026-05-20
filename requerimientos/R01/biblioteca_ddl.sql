@@ -1,59 +1,126 @@
--- =============================================================
--- G0401 — APE 115 — Requerimiento R01
--- Archivo: requerimientos/R01/biblioteca_ddl.sql
--- Descripción: DDL completo del sistema de biblioteca
--- Autor: (escribe tu nombre aquí)
--- Ejecutar: sqlite3 biblioteca.db < biblioteca_ddl.sql
--- =============================================================
-
+-- Activar claves foráneas en SQLite
 PRAGMA foreign_keys = ON;
+
+-- Mostrar resultados legibles
 .headers on
 .mode column
 
--- TODO R01.1: Crear tabla 'autor'
--- Columnas: id_autor (PK AUTOINCREMENT), nombre TEXT NOT NULL,
---           nacionalidad TEXT, activo INTEGER DEFAULT 1
--- CREATE TABLE IF NOT EXISTS autor ( ... );
+-- CREACIÓN DE TABLAS
 
+-- Tabla autores
+CREATE TABLE IF NOT EXISTS autor (
+    id_autor INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    nacionalidad VARCHAR(50)
+);
 
--- TODO R01.2: Crear tabla 'libro'
--- Columnas: id_libro (PK), titulo NOT NULL, isbn TEXT UNIQUE,
---           precio REAL CHECK(>0), stock_total INTEGER DEFAULT 5,
---           stock_disponible INTEGER DEFAULT 5, activo INTEGER DEFAULT 1,
---           id_autor (FK → autor ON DELETE RESTRICT ON UPDATE CASCADE)
--- CREATE TABLE IF NOT EXISTS libro ( ... );
+-- Tabla libros
+CREATE TABLE IF NOT EXISTS libro (
+    id_libro INTEGER PRIMARY KEY AUTOINCREMENT,
+    titulo VARCHAR(150) NOT NULL,
+    id_autor INTEGER NOT NULL,
+    precio REAL NOT NULL CHECK(precio > 0),
+    stock_disponible INTEGER NOT NULL DEFAULT 0 CHECK(stock_disponible >= 0),
 
+    CONSTRAINT fk_libro_autor
+        FOREIGN KEY(id_autor)
+        REFERENCES autor(id_autor)
+        ON DELETE RESTRICT
+);
 
--- TODO R01.3: Crear tabla 'estudiante'
--- Columnas: id_estudiante (PK), carnet TEXT UNIQUE NOT NULL,
---           nombres TEXT NOT NULL, apellidos TEXT NOT NULL,
---           email TEXT UNIQUE, carrera TEXT, activo INTEGER DEFAULT 1
--- CREATE TABLE IF NOT EXISTS estudiante ( ... );
+-- Tabla estudiantes
+CREATE TABLE IF NOT EXISTS estudiante (
+    id_estudiante INTEGER PRIMARY KEY AUTOINCREMENT,
+    carnet VARCHAR(20) UNIQUE NOT NULL,
+    nombres VARCHAR(100) NOT NULL,
+    apellidos VARCHAR(100) NOT NULL,
+    carrera VARCHAR(100) NOT NULL
+);
 
+-- Tabla prestamos
+CREATE TABLE IF NOT EXISTS prestamo (
+    id_prestamo INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_estudiante INTEGER NOT NULL,
+    id_libro INTEGER NOT NULL,
+    fecha_prestamo DATE NOT NULL,
+    fecha_devolucion DATE NOT NULL,
+    estado VARCHAR(20) NOT NULL
+        CHECK(estado IN ('activo','devuelto')),
 
--- TODO R01.4: Crear tabla 'prestamo'
--- Columnas: id_prestamo (PK), fecha_prestamo TEXT DEFAULT datetime('now','localtime'),
---           fecha_devolucion TEXT NOT NULL, fecha_devuelto TEXT,
---           estado TEXT DEFAULT 'activo' CHECK(estado IN ('activo','devuelto','vencido')),
---           id_estudiante (FK → estudiante), id_libro (FK → libro ON DELETE RESTRICT)
--- CREATE TABLE IF NOT EXISTS prestamo ( ... );
+    CONSTRAINT fk_prestamo_estudiante
+        FOREIGN KEY(id_estudiante)
+        REFERENCES estudiante(id_estudiante)
+        ON DELETE RESTRICT,
 
+    CONSTRAINT fk_prestamo_libro
+        FOREIGN KEY(id_libro)
+        REFERENCES libro(id_libro)
+        ON DELETE RESTRICT
+);
 
--- TODO R01.5: Crear índices
--- Usar prefijo idx_ (estándar APE115)
--- En todas las FK, en libro(titulo) y en prestamo(estado)
--- CREATE INDEX IF NOT EXISTS idx_... ON ...;
+-- ÍNDICES
 
+CREATE INDEX IF NOT EXISTS idx_libro_titulo
+ON libro(titulo);
 
--- TODO R01.6: Insertar datos de prueba con INSERT OR IGNORE
--- Mínimo: 3 autores, 6 libros, 4 estudiantes, 5 préstamos
--- INSERT OR IGNORE INTO autor(nombre, nacionalidad) VALUES (...);
+CREATE INDEX IF NOT EXISTS idx_estudiante_carnet
+ON estudiante(carnet);
 
+CREATE INDEX IF NOT EXISTS idx_prestamo_estado
+ON prestamo(estado);
 
--- Verificación automática (NO modificar estas líneas)
-SELECT 'tablas=' || COUNT(*) FROM sqlite_master
-WHERE  type = 'table' AND name IN ('autor','libro','estudiante','prestamo');
-SELECT 'autores='     || COUNT(*) FROM autor;
-SELECT 'libros='      || COUNT(*) FROM libro;
-SELECT 'estudiantes=' || COUNT(*) FROM estudiante;
-SELECT 'prestamos='   || COUNT(*) FROM prestamo;
+-- INSERTAR AUTORES
+
+INSERT OR IGNORE INTO autor(id_autor, nombre, nacionalidad)
+VALUES
+(1, 'Gabriel Garcia Marquez', 'Colombia'),
+(2, 'Mario Vargas Llosa', 'Peru'),
+(3, 'Julio Verne', 'Francia');
+
+-- INSERTAR LIBROS
+
+INSERT OR IGNORE INTO libro
+(id_libro, titulo, id_autor, precio, stock_disponible)
+VALUES
+(1, 'Cien Anos de Soledad', 1, 18.50, 5),
+(2, 'El Amor en los Tiempos del Colera', 1, 16.00, 3),
+(3, 'La Ciudad y los Perros', 2, 15.75, 4),
+(4, 'Conversacion en la Catedral', 2, 20.00, 2),
+(5, 'Viaje al Centro de la Tierra', 3, 14.25, 6),
+(6, 'Veinte Mil Leguas de Viaje Submarino', 3, 19.50, 1);
+
+-- INSERTAR ESTUDIANTES
+
+INSERT OR IGNORE INTO estudiante
+(id_estudiante, carnet, nombres, apellidos, carrera)
+VALUES
+(1, 'SM2026001', 'Carlos', 'Martinez', 'Ingenieria en Sistemas'),
+(2, 'SM2026002', 'Ana', 'Lopez', 'Ingenieria Industrial'),
+(3, 'SM2026003', 'Luis', 'Hernandez', 'Arquitectura'),
+(4, 'SM2026004', 'Maria', 'Gomez', 'Ingenieria en Sistemas');
+
+-- INSERTAR PRESTAMOS
+
+INSERT OR IGNORE INTO prestamo
+(id_prestamo, id_estudiante, id_libro, fecha_prestamo, fecha_devolucion, estado)
+VALUES
+(1, 1, 1, '2026-05-01', '2026-05-10', 'devuelto'),
+(2, 2, 3, '2026-05-05', '2026-05-18', 'activo'),
+(3, 3, 5, '2026-05-02', '2026-05-12', 'devuelto'),
+(4, 4, 2, '2026-05-08', '2026-05-20', 'activo'),
+(5, 1, 6, '2026-05-03', '2026-05-14', 'activo');
+
+-- CONSULTAS DE VERIFICACIÓN
+
+-- Mostrar autores
+SELECT * FROM autor;
+
+-- Mostrar libros
+SELECT * FROM libro;
+
+-- Mostrar estudiantes
+SELECT * FROM estudiante;
+
+-- Mostrar préstamos
+SELECT * FROM prestamo;
+
