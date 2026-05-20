@@ -16,8 +16,7 @@ INNER JOIN prestamo p
 GROUP BY e.id_estudiante
 HAVING COUNT(p.id_prestamo) >
 (
-    SELECT COUNT(*) * 1.0 /
-           COUNT(DISTINCT id_estudiante)
+    SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_estudiante)
     FROM prestamo
 );
 
