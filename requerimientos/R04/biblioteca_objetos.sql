@@ -52,7 +52,7 @@ WHEN (
 ) <= 0
 
 BEGIN
-    SELECT RAISE( ROLLBACK, 'No hay stock disponible para este libro');
+    SELECT RAISE(ROLLBACK,'No hay stock disponible para este libro');
 END;
 
 -- TRIGGER 2

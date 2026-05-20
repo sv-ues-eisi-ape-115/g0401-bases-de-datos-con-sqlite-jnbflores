@@ -9,14 +9,18 @@ PRAGMA foreign_keys = ON;
 -- Estudiantes que han tomado más libros que el promedio
 
 SELECT e.nombres || ' ' || e.apellidos AS estudiante,
-       COUNT(p.id_prestamo) AS total_prestamos
+       (
+           SELECT COUNT(*)
+           FROM prestamo p
+           WHERE p.id_estudiante = e.id_estudiante
+       ) AS total_prestamos
 FROM estudiante e
-INNER JOIN prestamo p
-    ON e.id_estudiante = p.id_estudiante
-GROUP BY e.id_estudiante
-HAVING COUNT(p.id_prestamo) >
-(
-    SELECT COUNT(*) * 1.0 / COUNT(DISTINCT id_estudiante)
+WHERE (
+    SELECT COUNT(*)
+    FROM prestamo p
+    WHERE p.id_estudiante = e.id_estudiante
+) > (
+    SELECT COUNT(*) / COUNT(DISTINCT id_estudiante)
     FROM prestamo
 );
 
